@@ -1,6 +1,6 @@
-// ======================================================
-// MODULE IMPORTS (LOCKED VERSIONS – GITHUB SAFE)
-// ======================================================
+/* ============================================================
+   LOCKED IMPORTS — REQUIRED FOR GITHUB PAGES
+   ============================================================ */
 import * as THREE from "https://esm.sh/three@0.158.0";
 import { Pane } from "https://cdn.skypack.dev/tweakpane@4.0.4";
 import { EffectComposer } from "https://esm.sh/three@0.158.0/examples/jsm/postprocessing/EffectComposer.js";
@@ -9,43 +9,49 @@ import { UnrealBloomPass } from "https://esm.sh/three@0.158.0/examples/jsm/postp
 import { OutputPass } from "https://esm.sh/three@0.158.0/examples/jsm/postprocessing/OutputPass.js";
 import { ShaderPass } from "https://esm.sh/three@0.158.0/examples/jsm/postprocessing/ShaderPass.js";
 
-// ======================================================
-// PRELOADER
-// ======================================================
+/* ============================================================
+   PRELOADER — UNCHANGED
+   ============================================================ */
 class PreloaderManager {
   constructor() {
     this.preloader = document.getElementById("preloader");
     this.mainContent = document.getElementById("main-content");
     this.progressBar = document.querySelector(".progress-bar");
+    this.loadingSteps = 0;
     this.totalSteps = 5;
-    this.current = 0;
-    this.done = false;
+    this.isComplete = false;
   }
 
-  step() {
-    this.current++;
-    this.progressBar.style.width = `${(this.current / this.totalSteps) * 100}%`;
+  updateProgress(step) {
+    this.loadingSteps = Math.min(step, this.totalSteps);
+    this.progressBar.style.width =
+      (this.loadingSteps / this.totalSteps) * 100 + "%";
   }
 
   complete(canvas) {
-    if (this.done) return;
-    this.done = true;
+    if (this.isComplete) return;
+    this.isComplete = true;
+
+    this.updateProgress(this.totalSteps);
 
     setTimeout(() => {
       this.preloader.classList.add("fade-out");
       this.mainContent.classList.add("fade-in");
       canvas.classList.add("fade-in");
-      setTimeout(() => (this.preloader.style.display = "none"), 1000);
-    }, 1200);
+
+      setTimeout(() => {
+        this.preloader.style.display = "none";
+      }, 1000);
+    }, 1500);
   }
 }
 
 const preloader = new PreloaderManager();
-preloader.step();
+preloader.updateProgress(1);
 
-// ======================================================
-// SCENE / CAMERA / RENDERER
-// ======================================================
+/* ============================================================
+   SCENE / CAMERA / RENDERER
+   ============================================================ */
 const scene = new THREE.Scene();
 scene.background = null;
 
@@ -57,12 +63,13 @@ const camera = new THREE.PerspectiveCamera(
 );
 camera.position.z = 20;
 
+preloader.updateProgress(2);
+
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
-  alpha: true,
-  powerPreference: "high-performance"
+  powerPreference: "high-performance",
+  alpha: true
 });
-
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setClearColor(0x000000, 0);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -70,11 +77,9 @@ renderer.toneMappingExposure = 0.9;
 
 document.body.appendChild(renderer.domElement);
 
-preloader.step();
-
-// ======================================================
-// POST PROCESSING
-// ======================================================
+/* ============================================================
+   POST PROCESSING
+   ============================================================ */
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
 
@@ -86,11 +91,11 @@ const bloomPass = new UnrealBloomPass(
 );
 composer.addPass(bloomPass);
 
-preloader.step();
+preloader.updateProgress(3);
 
-// ======================================================
-// ANALOG DECAY SHADER (IDENTICAL LOGIC)
-// ======================================================
+/* ============================================================
+   ANALOG DECAY SHADER — UNCHANGED LOGIC
+   ============================================================ */
 const analogDecayPass = new ShaderPass({
   uniforms: {
     tDiffuse: { value: null },
@@ -98,20 +103,19 @@ const analogDecayPass = new ShaderPass({
     uAnalogIntensity: { value: 0.6 },
     uAnalogGrain: { value: 0.4 },
     uAnalogBleeding: { value: 1.0 },
+    uAnalogVSync: { value: 1.0 },
     uAnalogScanlines: { value: 1.0 },
     uAnalogVignette: { value: 1.0 },
     uAnalogJitter: { value: 0.4 },
     uLimboMode: { value: 0.0 }
   },
-
   vertexShader: `
     varying vec2 vUv;
-    void main(){
+    void main() {
       vUv = uv;
       gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
     }
   `,
-
   fragmentShader: `
     uniform sampler2D tDiffuse;
     uniform float uTime,uAnalogIntensity,uAnalogGrain,uAnalogBleeding;
@@ -149,13 +153,12 @@ const analogDecayPass = new ShaderPass({
     }
   `
 });
-
 composer.addPass(analogDecayPass);
 composer.addPass(new OutputPass());
 
-// ======================================================
-// GHOST BODY (RESTORED DEFORMATION)
-// ======================================================
+/* ============================================================
+   GHOST BODY — DEFORMATION RESTORED
+   ============================================================ */
 const ghostGroup = new THREE.Group();
 scene.add(ghostGroup);
 
@@ -173,7 +176,6 @@ for (let i = 0; i < pos.length; i += 3) {
       Math.sin((x + z) * 3) * 0.15;
   }
 }
-
 ghostGeometry.computeVertexNormals();
 
 const ghostMaterial = new THREE.MeshStandardMaterial({
@@ -188,38 +190,35 @@ const ghostMaterial = new THREE.MeshStandardMaterial({
 const ghostBody = new THREE.Mesh(ghostGeometry, ghostMaterial);
 ghostGroup.add(ghostBody);
 
-// ======================================================
-// EYES (RESTORED)
-// ======================================================
+/* ============================================================
+   EYES — RESTORED
+   ============================================================ */
 function createEyes() {
   const g = new THREE.Group();
   ghostGroup.add(g);
 
-  const socketMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
-  const glowMat = new THREE.MeshBasicMaterial({
+  const mat = new THREE.MeshBasicMaterial({
     color: 0x00ff80,
     transparent: true,
     opacity: 0
   });
 
   const geo = new THREE.SphereGeometry(0.3, 12, 12);
+  const left = new THREE.Mesh(geo, mat.clone());
+  const right = new THREE.Mesh(geo, mat.clone());
 
-  const l = new THREE.Mesh(geo, glowMat.clone());
-  const r = new THREE.Mesh(geo, glowMat.clone());
+  left.position.set(-0.7, 0.6, 2);
+  right.position.set(0.7, 0.6, 2);
 
-  l.position.set(-0.7, 0.6, 2);
-  r.position.set(0.7, 0.6, 2);
-
-  g.add(l, r);
-
-  return { l, r };
+  g.add(left, right);
+  return { left, right };
 }
 
 const eyes = createEyes();
 
-// ======================================================
-// LIGHTING
-// ======================================================
+/* ============================================================
+   LIGHTING
+   ============================================================ */
 scene.add(new THREE.AmbientLight(0x0a0a2e, 0.08));
 
 const rim1 = new THREE.DirectionalLight(0x4a90e2, 1.8);
@@ -230,51 +229,60 @@ const rim2 = new THREE.DirectionalLight(0x50e3c2, 1.2);
 rim2.position.set(8, -4, -6);
 scene.add(rim2);
 
-preloader.step();
+preloader.updateProgress(4);
 
-// ======================================================
-// INPUT
-// ======================================================
+/* ============================================================
+   INPUT
+   ============================================================ */
 const mouse = new THREE.Vector2();
 window.addEventListener("mousemove", e => {
   mouse.x = (e.clientX / innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / innerHeight) * 2 + 1;
 });
 
-// ======================================================
-// ANIMATION
-// ======================================================
-let t = 0;
-let ready = false;
+/* ============================================================
+   INITIAL RENDER (CRITICAL)
+   ============================================================ */
+let initialized = false;
 
-setTimeout(() => {
+function forceInitialRender() {
+  for (let i = 0; i < 3; i++) composer.render();
+  initialized = true;
   preloader.complete(renderer.domElement);
-  ready = true;
-}, 400);
+}
+
+preloader.updateProgress(5);
+setTimeout(forceInitialRender, 100);
+
+/* ============================================================
+   ANIMATION LOOP
+   ============================================================ */
+let time = 0;
 
 function animate() {
   requestAnimationFrame(animate);
-  if (!ready) return;
+  if (!initialized) return;
 
-  t += 0.01;
-  analogDecayPass.uniforms.uTime.value = t;
+  time += 0.01;
+  analogDecayPass.uniforms.uTime.value = time;
 
   ghostGroup.position.x += (mouse.x * 11 - ghostGroup.position.x) * 0.075;
   ghostGroup.position.y += (mouse.y * 7 - ghostGroup.position.y) * 0.075;
 
-  ghostBody.rotation.y = Math.sin(t * 1.4) * 0.05;
+  ghostBody.rotation.y = Math.sin(time * 1.4) * 0.05;
 
-  eyes.l.material.opacity = eyes.r.material.opacity =
-    Math.min(1, Math.abs(mouse.x) + Math.abs(mouse.y));
+  const glow = Math.min(1, Math.abs(mouse.x) + Math.abs(mouse.y));
+  eyes.left.material.opacity = glow;
+  eyes.right.material.opacity = glow;
 
   composer.render();
 }
 
 animate();
 
-// ======================================================
-// RESIZE
-// ======================================================
+/* ============================================================
+   RESIZE
+   ============================================================ */
 window.addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
